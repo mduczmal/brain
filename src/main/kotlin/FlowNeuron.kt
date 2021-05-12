@@ -19,10 +19,8 @@ class SimpleInput(private val _delay: Long) : Firing {
 }
 
 class FlowNeuron(private val input: Flow<Double>, private val threshold: Double) : Firing {
-    @FlowPreview
     override val potentials: Flow<ActionPotential> = firing()
     var voltage: Double = 0.0
-    @FlowPreview
     fun firing(): Flow<ActionPotential> = flow {
         input.buffer().collect {
             voltage += it
