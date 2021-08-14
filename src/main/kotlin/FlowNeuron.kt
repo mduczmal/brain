@@ -4,13 +4,15 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.runBlocking
 
 object ActionPotential
+typealias Synapse = Flow<Double>
 
 interface Firing {
-    val potentials: Flow<ActionPotential>
+    fun firing(): Flow<ActionPotential>
+    fun toSynapse(weight: Double): Synapse = firing().map { weight }
 }
 
 class SimpleInput(private val _delay: Long) : Firing {
-    override val potentials: Flow<ActionPotential> = flow {
+    override fun firing() = flow {
         while (true) {
             emit(ActionPotential)
             delay(_delay)
@@ -18,13 +20,11 @@ class SimpleInput(private val _delay: Long) : Firing {
     }
 }
 
-class FlowNeuron(private val input: Flow<Double>, private val threshold: Double) : Firing {
-    @FlowPreview
-    override val potentials: Flow<ActionPotential> = firing()
+@FlowPreview
+class FlowNeuron(private val threshold: Double, private val synapses: List<Synapse>) : Firing {
     var voltage: Double = 0.0
-    @FlowPreview
-    fun firing(): Flow<ActionPotential> = flow {
-        input.buffer().collect {
+    override fun firing() = flow {
+        synapses.asFlow().flattenMerge().buffer().collect {
             voltage += it
             println(voltage)
             if (voltage > threshold) {
@@ -36,19 +36,13 @@ class FlowNeuron(private val input: Flow<Double>, private val threshold: Double)
 }
 
 @FlowPreview
-fun List<Firing>.toInput(weights: List<Double>) : Flow<Double> {
-    return this.zip(weights) {
-        n: Firing, w: Double -> n.potentials.map { w }
-    }.asFlow().flattenMerge()
-}
-
-@FlowPreview
 suspend fun basicTest() {
     val weights = listOf(1.0, 2.0, 3.0)
-    val neurons = listOf(SimpleInput(200), SimpleInput(300), SimpleInput(250))
-    val input = neurons.toInput(weights)
-    val nOut = FlowNeuron(input, 79.0)
-    nOut.potentials.collect { println("Fired!") }
+    val neurons = listOf(SimpleInput(20), SimpleInput(30), SimpleInput(25))
+    val synapses: List<Synapse> = neurons.zip(weights) { n, w -> n.toSynapse(w) }
+    val nOut = FlowNeuron(79.0, synapses)
+    nOut.firing().take(2).collect { println("Fired!") }
+    println("Done!")
 }
 
 @FlowPreview
