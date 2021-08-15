@@ -24,7 +24,7 @@ class SimpleInput(private val _delay: Long) : Firing {
 
 @FlowPreview
 class Neuron(private val threshold: Double, private val synapses: List<Synapse>, private val refractoryPeriod: Long = 1,
-private val name: String = "neuron") : Firing {
+val name: String = "neuron") : Firing {
     var voltage: Double = 0.0
     private val _potentials = MutableSharedFlow<ActionPotential>(replay=0)
     override val potentials: SharedFlow<ActionPotential> = _potentials
@@ -45,34 +45,36 @@ private val name: String = "neuron") : Firing {
 }
 
 @FlowPreview
-suspend fun basicTest() {
+suspend fun basicTest(timeout: Long = 2000) {
     val weights = listOf(1.0, 2.0, 3.0)
     val neurons = listOf(SimpleInput(20), SimpleInput(30), SimpleInput(25))
     val synapses: List<Synapse> = neurons.zip(weights) { n, w -> Synapse(n, w) }
     val neuron = Neuron(79.0, synapses)
-    withTimeoutOrNull(5000) {
-        launch { neuron.potentials.take(2).collect { println("Fired!") } }
+    withTimeoutOrNull(timeout) {
+        launch { neuron.potentials.collect { println("Fired!") } }
         launch { neuron.fire() }
     }
     println("Done!")
 }
 
 @FlowPreview
-suspend fun twoNeurons() {
+suspend fun twoNeurons(timeout: Long = 2000) {
     val weights = listOf(1.0, 2.0, 3.0)
     val neurons = listOf(SimpleInput(20), SimpleInput(30), SimpleInput(25))
     val synapses: List<Synapse> = neurons.zip(weights) { n, w -> Synapse(n, w) }
     val neuron1 = Neuron(79.0, synapses, name = "neuron1")
     val neuron2 = Neuron(63.0, synapses, name = "neuron2")
-    coroutineScope {
+    withTimeoutOrNull(timeout) {
         launch {
-            neuron1.potentials.take(2).collect { println("Neuron1 fired!") }
+            neuron1.potentials.collect { println("Neuron1 fired!") }
         }
         launch {
-            neuron2.potentials.take(2).collect { println("Neuron2 fired!") }
+            neuron2.potentials.collect { println("Neuron2 fired!") }
         }
         launch {
             neuron1.fire()
+        }
+        launch {
             neuron2.fire()
         }
     }
@@ -80,7 +82,7 @@ suspend fun twoNeurons() {
 }
 
 @FlowPreview
-suspend fun twoOutputNeurons() {
+suspend fun twoOutputNeurons(timeout: Long = 2000) {
         //L1
         val weights = listOf(1.0, 2.0, 3.0)
         val inputs = listOf(SimpleInput(20), SimpleInput(30), SimpleInput(25))
@@ -90,15 +92,9 @@ suspend fun twoOutputNeurons() {
         val neuron1L2 = Neuron(1.0, listOf(Synapse(neuronL1, 1.0)), name = "neuron1L2")
         val neuron2L2 = Neuron(2.0, listOf(Synapse(neuronL1, 1.0)), name = "neuron2L2")
         val neurons = listOf(neuronL1, neuron1L2, neuron2L2)
-    withTimeoutOrNull(5000) {
-        launch {
-            neuronL1.potentials.collect { println("Neuron1L1 fired!") }
-        }
-        launch {
-            neuron1L2.potentials.collect { println("Neuron1L2 fired!") }
-        }
-        launch {
-            neuron2L2.potentials.collect { println("Neuron2L2 fired!") }
+    withTimeoutOrNull(timeout) {
+        for (neuron in neurons) {
+            launch { neuron.potentials.collect{ println("${neuron.name} fired!") } }
         }
         for (neuron in neurons) {
             launch { neuron.fire() }
